@@ -128,7 +128,7 @@ ok
 However, if you know the the correct IMDB ID of the movie, you can specify it.
 
 ```
-$ metamovie -i 0068646 ~/video/movies/the_godfather-part_i.mp4                                       master  ✗
+$ metamovie -i 0068646 ~/video/movies/the_godfather-part_i.mp4
 {'cast': [u'Marlon Brando',
           u'Al Pacino',
           u'James Caan',
