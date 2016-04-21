@@ -1,0 +1,201 @@
+#! /usr/bin/env python2
+import os
+import pprint
+import re
+import sys
+import argparse
+import subprocess
+from imdb import IMDb
+
+
+def avg_runtime(movie):
+    """
+    Average all available runtimes for the given movie.
+    """
+    total = 0
+    for time in movie['runtimes']:
+        try:
+            total += int(time)
+        except ValueError:
+            # Get rid of anything parenthetical (like a year).
+            time = re.sub("[\(].*?[\)]", "", time)
+            # Now hope that all remaining digits are a time.
+            total += int(re.sub("[^0-9]", "", time))
+    return total / len(movie['runtimes'])
+
+
+def multi_value(attribute, values):
+    """
+    Build the git-annex metadata command for attributes with multiple values.
+    """
+    command = []
+    for count, value in enumerate(values):
+        # For the first run we want to set the value.
+        if count == 0:
+            command += ['--set', '%s=%s' % (attribute, value)]
+        # For future runs we want to append to the value.
+        else:
+            command += ['--set', '%s+=%s' % (attribute, value)]
+    return command
+
+
+def build_command(metadict, filename):
+    """
+    Build the git-annex command used to set the metadata fields.
+    """
+    command = ['git-annex',
+               'metadata',
+               ]
+    for attribute, value in metadict.iteritems():
+        if type(value) is list:
+            command += multi_value(attribute, value)
+        else:
+            command += ['--set', '%s=%s' % (attribute, value)]
+    command.append(filename)
+    return command
+
+
+def write_metadata(metadict, filename, dry=False):
+    """
+    Execute the git-annex command.
+    """
+    command = build_command(metadict, filename)
+    dirname = os.path.dirname(filename)
+    basename = os.path.basename(filename)
+    # If this is a dry run, just print the built command.
+    if dry:
+        print ' '.join(command)
+    else:
+        try:
+            process = subprocess.check_output(command, cwd=dirname)
+        except OSError:
+            print 'Could not find git-annex'
+            sys.exit(2)
+        else:
+            print process
+
+
+def build_data(movie, limit):
+    """
+    Build a dictionary of the desire metadata.
+    """
+    metadict = {}
+    metadict['imdb_id'] = movie.movieID
+    metadict['year'] = movie['year']
+    metadict['rating'] = movie['rating']
+    metadict['director'] = [person['name'] for person
+                            in movie['director'][:limit]]
+    metadict['genre'] = movie['genre'][:limit]
+    metadict['cast'] = [person['name'] for person in movie['cast'][:limit]]
+    # Not all movies have writers, so check if the attribute exists.
+    try:
+        metadict['writer'] = list(set([person['name'] for person
+                                       in movie['writer'][:limit]]))
+    except KeyError:
+        pass
+    # If the movie is part of a series, we want to set extra attributes.
+    try:
+        parent = movie['episode of']
+    except KeyError:
+        metadict['title'] = movie['title']
+        metadict['kind'] = movie['kind']
+    else:
+        metadict['series'] = parent['title']
+        metadict['title'] = '%s : %s' % (metadict['series'], movie['title'])
+        metadict['kind'] = parent['kind']
+    # Set the season, if it exists.
+    try:
+        metadict['season'] = movie['season']
+    except KeyError:
+        pass
+    # Set the episode number, if it exists.
+    try:
+        metadict['episode'] = movie['episode']
+    except KeyError:
+        pass
+    # Some things don't have runtimes.
+    try:
+        metadict['runtime'] = avg_runtime(movie)
+    except KeyError:
+        pass
+    return metadict
+
+
+def search_movie(i, filename):
+    """
+    Search for the correct movie using the filename.
+    """
+    movie_name = os.path.splitext(os.path.basename(filename))[0]
+    movie_name.replace('_', ' ').replace('-', ' ')
+    search_results = i.search_movie(movie_name)
+    if not search_results:
+        print 'Could not find any matches!'
+        sys.exit(2)
+    for result in search_results:
+        print '%s:\t%s' % (result.movieID, result['long imdb canonical title'])
+    num = raw_input('Enter the ID of the correct movie [%s]: '
+                    % search_results[0].movieID)
+    if not num:
+        movie_id = search_results[0].movieID
+    else:
+        movie_id = num
+    print 'Ok, using %s' % (movie_id)
+    return movie_id
+
+
+def check_file(filename):
+    """
+    Verify that the file exists.
+
+    We're in git-annex land, so dangling links are acceptable.
+    """
+    if not os.path.isfile(filename) and not os.path.islink(filename):
+        print 'File not found: %s' % filename
+        sys.exit(2)
+
+
+def main():
+    # Parse command-line arguments.
+    parser = argparse.ArgumentParser(description='Fetch git-annex metadata from IMDB')
+    parser.add_argument('filename')
+    parser.add_argument('-d', '--dry', action='store_const', const=True, dest='dry',
+                        help='Do not write metadata.')
+    parser.add_argument('-f', '--force', action='store_const', const=True, dest='force',
+                        help='Do not prompt user to accept metadata.')
+    parser.add_argument('-i', '--id', action='store', dest='id',
+                        help='Specify the IMDB ID of the movie.')
+    parser.add_argument('-l', '--limit', action='store', dest='limit',
+                        help='Limit the number of values to be saved for list attributes '
+                             '(default: 6).')
+    args = parser.parse_args()
+
+    # Check the given file.
+    check_file(args.filename)
+
+    # Get the movie.
+    i = IMDb()
+    if args.id:
+        movie_id = args.id
+    else:
+        movie_id = search_movie(i, args.filename)
+    movie = i.get_movie(movie_id)
+
+    # Set the list limit.
+    if args.limit:
+        limit = int(args.limit)
+    else:
+        limit = 6
+
+    # Present the metadata and confirm.
+    metadict = build_data(movie, limit)
+    pprint.pprint(metadict)
+    if not args.force:
+        var = raw_input('Is this correct? (y/n) ')
+        if var.lower() not in ['y', 'yes']:
+            print 'Aw, shucks'
+            sys.exit(0)
+    # Write it.
+    write_metadata(metadict, args.filename, args.dry)
+
+if __name__ == "__main__":
+    main()
