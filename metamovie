@@ -83,10 +83,14 @@ def build_data(movie, limit):
     metadict['imdb_id'] = movie.movieID
     metadict['year'] = movie['year']
     metadict['rating'] = movie['rating']
-    metadict['director'] = [person['name'] for person
-                            in movie['director'][:limit]]
     metadict['genre'] = movie['genre'][:limit]
     metadict['cast'] = [person['name'] for person in movie['cast'][:limit]]
+    # Not all movies have directors, so check if the attribute exists.
+    try:
+        metadict['director'] = [person['name'] for person
+                                in movie['director'][:limit]]
+    except KeyError:
+        pass
     # Not all movies have writers, so check if the attribute exists.
     try:
         metadict['writer'] = list(set([person['name'] for person
