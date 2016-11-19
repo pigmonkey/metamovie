@@ -18,7 +18,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -d, --dry             Do not write metadata.
   -f, --force           Do not prompt user to accept metadata.
-  -i ID, --id ID        Specify the IMDB ID of the movie.
+  -i ID, --id ID        Specify the IMDB ID (or URL) of the movie.
   -l LIMIT, --limit LIMIT
                         Limit the number of values to be saved for list
                         attributes (default: 6).

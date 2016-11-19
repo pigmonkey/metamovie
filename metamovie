@@ -157,6 +157,17 @@ def check_file(filename):
         print 'File not found: %s' % filename
         sys.exit(2)
 
+def parse_id(arg):
+    """
+    Find the movie ID from the given argument.
+
+    If the user passed an ID directly (such as "0105435") this ends up just
+    returning the same thing. If the user passed a URL to an IMDB page (such as
+    "http://www.imdb.com/title/tt0105435/") this will extract the ID. It seems
+    like a dirty hack, but it works.
+    """
+    movie_id = arg.split('/tt')[-1].split('/')[0]
+    return movie_id
 
 def main():
     # Parse command-line arguments.
@@ -167,7 +178,7 @@ def main():
     parser.add_argument('-f', '--force', action='store_const', const=True, dest='force',
                         help='Do not prompt user to accept metadata.')
     parser.add_argument('-i', '--id', action='store', dest='id',
-                        help='Specify the IMDB ID of the movie.')
+                        help='Specify the IMDB ID (or URL) of the movie.')
     parser.add_argument('-l', '--limit', action='store', dest='limit',
                         help='Limit the number of values to be saved for list attributes '
                              '(default: 6).')
@@ -179,7 +190,7 @@ def main():
     # Get the movie.
     i = IMDb()
     if args.id:
-        movie_id = args.id
+        movie_id = parse_id(args.id)
     else:
         movie_id = search_movie(i, args.filename)
     movie = i.get_movie(movie_id)
