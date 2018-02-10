@@ -286,7 +286,7 @@ $ tree -d
 
 ## Requirements
 
-* [Python 2][4]
+* [Python 3][4]
 * [IMDbPyY][5]
 * [git-annex][1]
 
@@ -295,4 +295,4 @@ $ tree -d
 [2]: https://git-annex.branchable.com/metadata/
 [3]: https://git-annex.branchable.com/tips/metadata_driven_views/
 [4]: https://www.python.org/
-[5]: http://imdbpy.sourceforge.net/
+[5]: https://github.com/alberanid/imdbpy

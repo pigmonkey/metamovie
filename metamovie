@@ -1,10 +1,11 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 import os
 import pprint
 import re
 import sys
 import argparse
 import subprocess
+from builtins import input
 from imdb import IMDb
 
 
@@ -43,10 +44,11 @@ def build_command(metadict, filename):
     """
     Build the git-annex command used to set the metadata fields.
     """
-    command = ['git-annex',
-               'metadata',
-               ]
-    for attribute, value in metadict.iteritems():
+    command = [
+        'git-annex',
+        'metadata',
+    ]
+    for attribute, value in metadict.items():
         if type(value) is list:
             command += multi_value(attribute, value)
         else:
@@ -61,18 +63,17 @@ def write_metadata(metadict, filename, dry=False):
     """
     command = build_command(metadict, filename)
     dirname = os.path.dirname(filename)
-    basename = os.path.basename(filename)
     # If this is a dry run, just print the built command.
     if dry:
-        print ' '.join(command)
+        print(' '.join(command))
     else:
         try:
             process = subprocess.check_output(command, cwd=dirname)
         except OSError:
-            print 'Could not find git-annex'
+            print('Could not find git-annex')
             sys.exit(2)
         else:
-            print process
+            print(process.decode('utf-8'))
 
 
 def build_data(movie, limit):
@@ -93,8 +94,9 @@ def build_data(movie, limit):
         pass
     # Not all movies have writers, so check if the attribute exists.
     try:
-        metadict['writer'] = list(set([person['name'] for person
-                                       in movie['writer'][:limit]]))
+        metadict['writer'] = list(set(
+            [person['name'] for person in movie['writer'][:limit]]
+        ))
     except KeyError:
         pass
     # If the movie is part of a series, we want to set extra attributes.
@@ -133,17 +135,23 @@ def search_movie(i, filename):
     movie_name.replace('_', ' ').replace('-', ' ')
     search_results = i.search_movie(movie_name)
     if not search_results:
-        print 'Could not find any matches!'
+        print('Could not find any matches!')
         sys.exit(2)
     for result in search_results:
-        print '%s:\t%s' % (result.movieID, result['long imdb canonical title'])
-    num = raw_input('Enter the ID of the correct movie [%s]: '
-                    % search_results[0].movieID)
+        print(
+            '%s:\t%s' % (
+                result.movieID,
+                result['long imdb canonical title']
+            )
+        )
+    num = input(
+        'Enter the ID of the correct movie [%s]: ' % search_results[0].movieID
+    )
     if not num:
         movie_id = search_results[0].movieID
     else:
         movie_id = num
-    print 'Ok, using %s' % (movie_id)
+    print('Ok, using %s' % (movie_id))
     return movie_id
 
 
@@ -154,8 +162,9 @@ def check_file(filename):
     We're in git-annex land, so dangling links are acceptable.
     """
     if not os.path.isfile(filename) and not os.path.islink(filename):
-        print 'File not found: %s' % filename
+        print('File not found: %s' % filename)
         sys.exit(2)
+
 
 def parse_id(arg):
     """
@@ -169,19 +178,43 @@ def parse_id(arg):
     movie_id = arg.split('/tt')[-1].split('/')[0]
     return movie_id
 
+
 def main():
     # Parse command-line arguments.
-    parser = argparse.ArgumentParser(description='Fetch git-annex metadata from IMDB')
+    parser = argparse.ArgumentParser(
+        description='Fetch git-annex metadata from IMDB'
+    )
     parser.add_argument('filename')
-    parser.add_argument('-d', '--dry', action='store_const', const=True, dest='dry',
-                        help='Do not write metadata.')
-    parser.add_argument('-f', '--force', action='store_const', const=True, dest='force',
-                        help='Do not prompt user to accept metadata.')
-    parser.add_argument('-i', '--id', action='store', dest='id',
-                        help='Specify the IMDB ID (or URL) of the movie.')
-    parser.add_argument('-l', '--limit', action='store', dest='limit',
-                        help='Limit the number of values to be saved for list attributes '
-                             '(default: 6).')
+    parser.add_argument(
+        '-d',
+        '--dry',
+        action='store_const',
+        const=True,
+        dest='dry',
+        help='Do not write metadata.'
+    )
+    parser.add_argument(
+        '-f',
+        '--force',
+        action='store_const',
+        const=True,
+        dest='force',
+        help='Do not prompt user to accept metadata.'
+    )
+    parser.add_argument(
+        '-i',
+        '--id',
+        action='store',
+        dest='id',
+        help='Specify the IMDB ID (or URL) of the movie.'
+    )
+    parser.add_argument(
+        '-l',
+        '--limit',
+        action='store',
+        dest='limit',
+        help='Limit the number of values to be saved for list attributes (default: 6).'
+    )
     args = parser.parse_args()
 
     # Check the given file.
@@ -205,12 +238,13 @@ def main():
     metadict = build_data(movie, limit)
     pprint.pprint(metadict)
     if not args.force:
-        var = raw_input('Is this correct? (y/n) ')
+        var = input('Is this correct? (y/n) ')
         if var.lower() not in ['y', 'yes']:
-            print 'Aw, shucks'
+            print('Aw, shucks')
             sys.exit(0)
     # Write it.
     write_metadata(metadict, args.filename, args.dry)
+
 
 if __name__ == "__main__":
     main()
